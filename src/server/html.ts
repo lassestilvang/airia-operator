@@ -379,6 +379,16 @@ export function renderAppHtml(): string {
         font-size: 15px;
       }
 
+      .approval-summary {
+        margin-top: 1rem;
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+
+      .approval-details {
+        margin-bottom: 1.5rem;
+      }
+
       .approval-actions {
         display: flex;
         gap: 16px;
@@ -482,7 +492,8 @@ export function renderAppHtml(): string {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
           Governance Check Required
         </h3>
-        <p id="approvalMessage">Critical action detected: Outbound external communication requires mandatory human validation.</p>
+        <p id="approvalMessage" class="approval-summary">Outbound external communication requires mandatory human validation.</p>
+        <div id="approvalDetails" class="approval-details"></div>
         <div class="approval-actions">
           <button id="approveBtn" class="btn-approve">APPROVE DISPATCH</button>
           <button id="rejectBtn" class="btn-reject">REJECT</button>
@@ -553,8 +564,18 @@ export function renderAppHtml(): string {
         summarySlack.style.color = data.slack_sent ? 'var(--success)' : 'var(--warning)'
       }
 
-      function setApproval(open, text) {
-        if (text) approvalMessage.textContent = text
+      function setApproval(open, eventData) {
+        if (eventData) {
+          approvalMessage.textContent = eventData.message
+          const details = document.getElementById('approvalDetails')
+          if (eventData.data && eventData.data.actions) {
+            details.innerHTML = '<ul style="text-align: left; margin: 1rem 0; padding-left: 1.5rem; color: var(--text-muted); font-size: 0.9rem;">' + 
+              eventData.data.actions.map(a => `<li style="margin-bottom: 0.4rem;">${a}</li>`).join('') + 
+              '</ul>'
+          } else {
+            details.innerHTML = ''
+          }
+        }
         if (open) {
           approvalModal.classList.add('active')
         } else {
@@ -598,7 +619,8 @@ export function renderAppHtml(): string {
           const snapshot = JSON.parse(message.data)
           ;(snapshot.events || []).forEach(addLine)
           if (snapshot.awaitingApproval) {
-            setApproval(true)
+            const approvalEvent = [...snapshot.events].reverse().find(e => e.status === 'paused_approval')
+            setApproval(true, approvalEvent)
           }
           setSummary(snapshot.summary)
           if (snapshot.status === 'completed' || snapshot.status === 'failed' || snapshot.status === 'rejected') {
@@ -611,7 +633,7 @@ export function renderAppHtml(): string {
           addLine(event)
 
           if (event.status === 'paused_approval') {
-            setApproval(true)
+            setApproval(true, event)
           }
 
           if (event.status === 'completed' && event.stepId === 'finalize') {

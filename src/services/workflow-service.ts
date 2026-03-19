@@ -273,11 +273,16 @@ export class WorkflowService {
       stepId: 'governance_check',
       agent: 'governance',
       status: 'paused_approval',
-      message: `Approval required to email ${profile.contact_email}`,
+      message: `Governance Agent requires approval to dispatch the onboarding package to ${profile.company_name} at ${profile.contact_email}.`,
       data: {
-        reason: 'External email requires human approval',
+        reason: 'Outbound external communication',
         company: profile.company_name,
         contact_email: profile.contact_email,
+        actions: [
+          'Send onboarding guide via email',
+          'Post internal Slack notification',
+          'Finalize workflow execution'
+        ]
       },
     })
   }
