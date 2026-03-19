@@ -3,6 +3,12 @@ import type { AiriaAgentSpec, AiriaToolSpec } from './airia-client.js'
 export const WORKFLOW_NAME = 'enterprise_customer_onboarding'
 
 export function buildToolSpecs(appBaseUrl: string): AiriaToolSpec[] {
+  const bypassHeader = {
+    key: 'bypass-tunnel-reminder',
+    value: 'true',
+    sensitive: false,
+  }
+
   return [
     {
       key: 'mock-crm',
@@ -23,7 +29,7 @@ export function buildToolSpecs(appBaseUrl: string): AiriaToolSpec[] {
             requirement: 'Required',
           },
         ],
-        headers: [],
+        headers: [bypassHeader],
         bodyType: 'None',
         requestTimeout: 30,
         routeThroughACC: false,
@@ -54,6 +60,7 @@ export function buildToolSpecs(appBaseUrl: string): AiriaToolSpec[] {
             value: 'application/json',
             sensitive: false,
           },
+          bypassHeader,
         ],
         bodyType: 'Json',
         requestTimeout: 30,
@@ -85,6 +92,7 @@ export function buildToolSpecs(appBaseUrl: string): AiriaToolSpec[] {
             value: 'application/json',
             sensitive: false,
           },
+          bypassHeader,
         ],
         bodyType: 'Json',
         requestTimeout: 30,
@@ -116,6 +124,7 @@ export function buildToolSpecs(appBaseUrl: string): AiriaToolSpec[] {
             value: 'application/json',
             sensitive: false,
           },
+          bypassHeader,
         ],
         bodyType: 'Json',
         requestTimeout: 30,
