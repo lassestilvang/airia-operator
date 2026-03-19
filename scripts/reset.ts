@@ -1,4 +1,4 @@
 import { resetState } from '../src/state/store.js'
 
 resetState()
-console.log('Demo state reset complete.')
+console.log('Operational state reset complete.')
