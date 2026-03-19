@@ -181,7 +181,7 @@ export class WorkflowService {
       agent: 'crm',
       status: 'completed',
       message: 'CRM Agent fetched customer data',
-      data: profile as Record<string, unknown>,
+      data: profile as unknown as Record<string, unknown>,
     })
 
     this.emit(workflowId, {
