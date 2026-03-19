@@ -22,7 +22,7 @@ function runBootstrap(): Promise<void> {
 async function main(): Promise<void> {
   const config = getConfig()
 
-  console.log('Starting Airia Auto-Operator demo startup...')
+  console.log('Starting Airia Autonomous Operator...')
 
   if (!process.env.APP_BASE_URL) {
     process.env.APP_BASE_URL = `http://localhost:${config.port}`
@@ -42,6 +42,6 @@ async function main(): Promise<void> {
 
 main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error)
-  console.error(`demo:up failed: ${message}`)
+  console.error(`Operator startup failed: ${message}`)
   process.exit(1)
 })
