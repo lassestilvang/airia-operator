@@ -1,10 +1,12 @@
-# Airia Auto-Operator (Hackathon Demo)
+# Airia Autonomous Operator
 
-Demo-first implementation of the Airia Auto-Operator concept with:
+Autonomous enterprise operator built on Airia's agent orchestration platform.
 
-1. API-driven setup/provisioning (`scripts/bootstrap.ts`)
-2. Human-in-the-loop approval at runtime before external email
-3. Visible live orchestration in a local UI
+## Features
+
+1. **Autonomous Provisioning**: Fully automated setup and configuration of agents and tools via the Airia API.
+2. **Human-in-the-Loop Governance**: Secure orchestration with mandatory human approval for high-stakes actions.
+3. **Observability**: Real-time visibility into agent-by-agent orchestration and decision-making.
 
 ## Quick Start
 
@@ -14,45 +16,39 @@ Demo-first implementation of the Airia Auto-Operator concept with:
 npm install
 ```
 
-2. Copy `.env.example` to `.env` and update values as needed.
+2. Configure environment variables:
+   - Copy `.env.example` to `.env`.
+   - Set `AIRIA_API_KEY`, `AIRIA_PROJECT_ID`, and `AIRIA_API_BASE_URL`.
 
-3. Run demo startup:
+3. Initialize and start the operator:
 
 ```bash
-npm run demo:up
+npm run operator:up
 ```
 
-4. Open `http://localhost:3000`.
+4. Access the operator interface:
+   - Open `http://localhost:3000`.
 
-## Scripts
+## Operational Scripts
 
-1. `npm run demo:up` runs bootstrap then starts the local app.
-2. `npm run bootstrap` provisions or updates Airia resources via API.
-3. `npm run demo:reset` resets in-memory demo state.
-4. `npm run typecheck` runs TypeScript checks.
+- `npm run operator:up`: Provision resources and start the operator.
+- `npm run bootstrap`: Update or re-provision Airia resources.
+- `npm run operator:reset`: Reset the local operational state.
+- `npm run typecheck`: Perform static type analysis.
 
-## Environment
+## Environment Configuration
 
-Required for local demo mode:
+- `PORT`: Port for the local operator service (default: 3000).
+- `APP_BASE_URL`: Base URL where the operator is accessible.
+- `AIRIA_API_BASE_URL`: Airia API base endpoint.
+- `AIRIA_API_KEY`: Your Airia API key.
+- `AIRIA_PROJECT_ID`: Target project ID for resource provisioning.
 
-1. `PORT`
-2. `APP_BASE_URL`
+## API Architecture
 
-Optional for real Airia API provisioning:
+The operator exposes endpoints for workflow management, tool interaction, and system maintenance:
 
-1. `AIRIA_API_BASE_URL`
-2. `AIRIA_API_KEY`
-3. `AIRIA_PROJECT_ID`
-
-If `AIRIA_API_KEY` is unset, the app still runs end-to-end in local simulation mode.
-
-## API Endpoints
-
-1. `POST /api/workflow/run`
-2. `GET /api/workflow/:id/stream` (SSE)
-3. `POST /api/workflow/approve`
-4. `GET /api/workflow/:id`
-5. `GET /api/tools/crm?name=...`
-6. `POST /api/tools/tasks`
-7. `POST /api/tools/email`
-8. `POST /api/tools/slack`
+- `POST /api/workflow/run`: Execute a new autonomous workflow.
+- `GET /api/workflow/:id/stream`: Real-time SSE stream for execution events.
+- `POST /api/workflow/approve`: Grant or deny approval for governed actions.
+- `POST /api/system/reset`: Clear the current operational state.
