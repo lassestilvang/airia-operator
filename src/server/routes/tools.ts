@@ -8,9 +8,9 @@ const crmQuerySchema = z.object({
 })
 
 const tasksBodySchema = z.object({
-  customer_profile: z.record(z.any()).optional(),
+  customer_profile: z.record(z.string(), z.any()).optional(),
   doc_reference: z.string().optional(),
-  tasks: z.array(z.record(z.any())).optional(),
+  tasks: z.array(z.record(z.string(), z.any())).optional(),
 })
 
 const emailBodySchema = z.object({
