@@ -64,8 +64,9 @@ class AiriaClient {
   }
 
   private async listTools(): Promise<Array<{ id: string; name?: string; standardizedName?: string }>> {
+    const projectId = this.config.airiaProjectId ? `&ProjectId=${this.config.airiaProjectId}` : ''
     const page = await this.request<{ items?: Array<{ id: string; name?: string; standardizedName?: string }> }>(
-      '/v1/Tools?PageNumber=1&PageSize=200',
+      `/v1/Tools?PageNumber=1&PageSize=200${projectId}`,
       { method: 'GET' },
     )
     return page.items ?? []
@@ -75,58 +76,74 @@ class AiriaClient {
     const existing = await this.listTools()
     const found = existing.find((tool) => tool.name?.toLowerCase() === spec.payload.name?.toString().toLowerCase())
 
+    const payload = {
+      ...spec.payload,
+      projectId: this.config.airiaProjectId,
+    }
+
     if (!found) {
       const created = await this.request<{ id: string }>('/v1/Tools', {
         method: 'POST',
-        body: JSON.stringify(spec.payload),
+        body: JSON.stringify(payload),
       })
       return created.id
     }
 
     await this.request(`/v1/Tools/${found.id}`, {
       method: 'PUT',
-      body: JSON.stringify({ ...spec.payload, id: found.id }),
+      body: JSON.stringify({ ...payload, id: found.id }),
     })
     return found.id
   }
 
   private async listPipelines(): Promise<Array<{ id: string; name?: string }>> {
+    const projectId = this.config.airiaProjectId ? `&ProjectId=${this.config.airiaProjectId}` : ''
     const page = await this.request<{ items?: Array<{ id: string; name?: string }> }>(
-      '/v1/PipelinesConfig?PageNumber=1&PageSize=200',
+      `/v1/PipelinesConfig?PageNumber=1&PageSize=200${projectId}`,
       { method: 'GET' },
     )
     return page.items ?? []
   }
 
   private async createAssistantFromSpec(spec: AiriaAgentSpec): Promise<string> {
-    const payload: JsonObject = {
-      name: spec.name,
-      description: spec.description,
-      promptParameters: {
-        prompt: spec.prompt,
-      },
-      deploymentParameters: {
-        deployToChat: false,
-      },
-      modelParameters: {
-        modelIdentifierType: 'None',
-      },
-      dataStoreParameters: {
-        useDataStore: false,
-      },
-    }
-
-    await this.request('/v1/Assistants', {
-      method: 'POST',
-      body: JSON.stringify(payload),
+    const modelsPage = await this.request<{ items?: Array<{ id: string }> }>('/v1/Models?PageNumber=1&PageSize=1', {
+      method: 'GET',
     })
+    const modelId = modelsPage.items?.[0]?.id
 
-    const pipelines = await this.listPipelines()
-    const match = pipelines.find((pipeline) => pipeline.name === spec.name)
-    if (!match) {
-      throw new Error(`Assistant ${spec.name} was created but pipeline id could not be resolved`)
+    if (!modelId) {
+      throw new Error('No models available to create assistant')
     }
-    return match.id
+
+    const payload = [
+      {
+        projectId: this.config.airiaProjectId ?? '',
+        name: spec.name,
+        description: spec.description,
+        instructions: spec.prompt,
+        modelId,
+        version: '1.0.0',
+        skills: [],
+        modalities: ['text'],
+        defaultInputModes: ['text'],
+        defaultOutputModes: ['text'],
+      },
+    ]
+
+    const result = await this.request<Array<{ success: boolean; createdAgentId: string; errorMessage?: string }>>(
+      '/v1/AgentCard',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    )
+
+    const first = result[0]
+    if (!first?.success) {
+      throw new Error(`Failed to create agent card: ${first?.errorMessage ?? 'Unknown error'}`)
+    }
+
+    return first.createdAgentId
   }
 
   private async upsertAgent(spec: AiriaAgentSpec): Promise<string> {
@@ -143,14 +160,16 @@ class AiriaClient {
         id: existing.id,
         name: spec.name,
         description: spec.description,
+        projectId: this.config.airiaProjectId,
       }),
     })
     return existing.id
   }
 
   private async listSwarms(): Promise<Array<{ id: string; name: string; members?: Array<{ pipelineId: string }> }>> {
+    const projectId = this.config.airiaProjectId ? `&ProjectId=${this.config.airiaProjectId}` : ''
     const page = await this.request<{ items?: Array<{ id: string; name: string; members?: Array<{ pipelineId: string }> }> }>(
-      '/v1/AgentSwarms?PageNumber=1&PageSize=200',
+      `/v1/AgentSwarms?PageNumber=1&PageSize=200${projectId}`,
       { method: 'GET' },
     )
     return page.items ?? []
@@ -181,6 +200,7 @@ class AiriaClient {
         body: JSON.stringify({
           name,
           description: 'Hackathon onboarding orchestration swarm',
+          projectId: this.config.airiaProjectId,
         }),
       })
 
@@ -191,8 +211,10 @@ class AiriaClient {
     await this.request(`/v1/AgentSwarms/${existing.id}`, {
       method: 'PUT',
       body: JSON.stringify({
-        name,
+        id: existing.id,
+        name: name,
         description: 'Hackathon onboarding orchestration swarm',
+        projectId: this.config.airiaProjectId,
       }),
     })
 
