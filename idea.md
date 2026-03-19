@@ -1,505 +1,201 @@
-# 🚀 Airia Auto-Operator — Full Implementation Spec
+# 🚀 Airia Autonomous Operator — Core Specification
 
 ## 🧠 Overview
 
-**Airia Auto-Operator** is an enterprise AI system built on Airia’s agent orchestration platform. It accepts a high-level business goal and autonomously executes a multi-step workflow across enterprise tools using specialized agents.
+**Airia Autonomous Operator** is an enterprise AI orchestration system built on the Airia platform. It translates high-level business goals into autonomous execution across multiple agents and enterprise systems.
 
-### Core Example
+### Core Workflow Example
 
 Input:
 
 > "Onboard Acme Corp (Enterprise Plan, 200 seats)"
 
-System:
+System Execution:
 
-* Plans workflow using Airia
-* Orchestrates multiple agents
-* Executes actions across tools (CRM, Docs, Ops, Comms)
-* Enforces governance rules
-* Requests human approval when required
+*   Orchestrates a sequence of specialized agents.
+*   Executes actions across CRM, task systems, and communication channels.
+*   Enforces corporate governance and security policies.
+*   Integrates human-in-the-loop approval for critical operations.
+*   Provides real-time visibility and auditability.
 
 ---
 
-# 🎯 Goals
+# 🎯 Operational Objectives
 
-* Demonstrate **Airia-native agent orchestration**
-* Execute **real actions**, not just suggestions
-* Show **multi-agent collaboration**
-* Include **governance + human-in-the-loop**
-* Provide **clear observability of execution**
+*   **Native Orchestration**: Leverage Airia's agent-centric engine.
+*   **Direct Execution**: Perform real-world actions, moving beyond simple recommendations.
+*   **Multi-Agent Collaboration**: Enable seamless data flow between specialized agents.
+*   **Enterprise Governance**: Enforce safety and compliance rules.
+*   **Operational Visibility**: Provide a clear audit trail of all execution steps.
 
 ---
 
 # 🧩 System Architecture
 
-## 1. Airia Platform (Core Engine)
+## 1. Airia Platform (Core Orchestrator)
 
-Responsible for:
+The central engine responsible for:
 
-* Planning
-* Agent orchestration
-* Context passing
-* Execution lifecycle
-* Governance enforcement
-* Observability
+*   Workflow planning and execution.
+*   Agent context and state management.
+*   Governance policy enforcement.
+*   Real-time execution observability.
 
-## 2. Agents (Defined in Airia)
+## 2. Specialized Agents (Defined in Airia)
 
-Each agent must be independently defined with:
+Each agent is provisioned with a specific mission, description, and toolkit:
 
-* name
-* description
-* inputs
-* outputs
-* tools
-* prompt
+### 2.1 CRM Intelligence Agent
 
-### 2.1 CRM Agent
-
-**Purpose:** Retrieve customer data
+**Mission:** Retrieve and validate customer data.
 
 **Inputs:**
 
-* company_name (string)
+*   `company_name` (string)
 
 **Outputs:**
 
-```json
-{
-  "company_name": "string",
-  "plan": "string",
-  "seats": number,
-  "contact_email": "string",
-  "status": "string"
-}
-```
+*   `customer_profile` (structured JSON object)
 
-**Tool:**
+**Integration:**
 
-* GET /mock-crm/customer?name={company_name}
+*   CRM API: `GET /api/tools/crm?name={company_name}`
 
 ---
 
-### 2.2 Docs Agent
+### 2.2 Documentation Architect Agent
 
-**Purpose:** Generate onboarding documentation
+**Mission:** Generate structured onboarding documentation.
 
 **Inputs:**
 
-* customer_profile (object)
+*   `customer_profile` (object)
 
 **Outputs:**
 
-```json
-{
-  "doc_markdown": "string"
-}
-```
+*   `onboarding_guide` (markdown)
 
-**Prompt Behavior:**
+**Behavior:**
 
-* Generate structured onboarding guide
-* Include:
-
-  * welcome message
-  * setup steps
-  * assigned responsibilities
+*   Generate persona-specific onboarding guides.
+*   Define setup steps and assigned responsibilities.
 
 ---
 
-### 2.3 Ops Agent
+### 2.3 Operations Specialist Agent
 
-**Purpose:** Create onboarding tasks
+**Mission:** Initialize onboarding tasks and resource allocation.
 
 **Inputs:**
 
-* customer_profile
-* doc_reference
+*   `customer_profile`
+*   `onboarding_guide`
 
 **Outputs:**
 
-```json
-{
-  "tasks": [
-    {
-      "title": "string",
-      "owner": "string",
-      "status": "created"
-    }
-  ]
-}
-```
+*   `tasks` (structured task list)
 
-**Tool:**
+**Integration:**
 
-* POST /mock-tasks
+*   Task System API: `POST /api/tools/tasks`
 
 ---
 
-### 2.4 Comms Agent
+### 2.4 Communications Lead Agent
 
-**Purpose:** Send communications
+**Mission:** Execute external and internal communications.
 
 **Inputs:**
 
-* customer_profile
-* doc_markdown
+*   `customer_profile`
+*   `onboarding_guide`
 
 **Outputs:**
 
-```json
-{
-  "email_sent": boolean,
-  "slack_notified": boolean
-}
-```
+*   `communication_status` (boolean)
 
-**Tools:**
+**Integration:**
 
-* POST /send-email
-* POST /send-slack
+*   Email Dispatch API: `POST /api/tools/email`
+*   Notification API: `POST /api/tools/slack`
 
 ---
 
-### 2.5 Governance Agent (CRITICAL)
+### 2.5 Governance & Compliance Agent
 
-**Purpose:** Enforce enterprise rules
+**Mission:** Enforce enterprise safety and security rules.
 
-**Rules:**
+**Rule Engine:**
 
-* External email requires approval
-* Missing required fields → block execution
+*   Outbound communications require mandatory human approval.
+*   Data validation failures block further execution.
 
 **Inputs:**
 
-* planned_action
-* context
+*   `planned_action`
+*   `context`
 
 **Outputs:**
 
-```json
-{
-  "approved": boolean,
-  "requires_human": boolean,
-  "reason": "string"
-}
-```
+*   `governance_result` (approved, rejected, or pending)
 
 ---
 
-# 🔄 Airia Workflow Definition
+# 🔄 Workflow Orchestration
 
-## Workflow Name:
-
-`enterprise_customer_onboarding`
+**Workflow:** `enterprise_customer_onboarding`
 
 ---
 
-## Input Schema
+## 1. Goal Interpretation
+The orchestrator interprets the operational goal and identifies the required intent and parameters.
 
-```json
-{
-  "goal": "string"
-}
-```
+## 2. Customer Intelligence
+The CRM Agent retrieves the profile to ensure accurate data drives the workflow.
 
----
+## 3. Asset Generation
+The Documentation Agent generates technical guides based on the customer's plan and seats.
 
-## Execution Flow
+## 4. Operational Initialization
+The Operations Agent creates the required internal tasks for deployment.
 
-### Step 1 — Plan
+## 5. Governance Validation
+The Governance Agent evaluates the outbound communication plan against safety policies.
 
-Airia interprets goal:
+## 6. Human-in-the-Loop Validation (Governance Check)
+System pauses for mandatory human validation of outbound guides and recipient lists.
 
-* Extract company name
-* Identify onboarding intent
+## 7. Execution and Dispatch
+The Communications Agent executes the dispatch upon successful approval.
 
----
-
-### Step 2 — CRM Agent
-
-Fetch customer data
-
----
-
-### Step 3 — Docs Agent
-
-Generate onboarding documentation
+## 8. Final Synthesis
+System provides a consolidated report of all created tasks and communication statuses.
 
 ---
 
-### Step 4 — Ops Agent
+# 🖥️ Operator Interface
 
-Create internal onboarding tasks
+## 1. Goal Input
+Secure interface for triggering autonomous goals.
 
----
+## 2. Execution Telemetry (Real-time)
+A live feed showing:
+*   Active step and executing agent.
+*   Real-time state and message updates.
+*   Execution status (running, paused, completed).
 
-### Step 5 — Governance Check (Pre-Comms)
+## 3. Governance Control
+Mandatory approval component for human-in-the-loop checkpoints.
 
-Validate:
-
-* Is email allowed?
-* Is approval required?
-
----
-
-### Step 6 — Human Approval (if required)
-
-UI must present:
-
-```json
-{
-  "message": "Approve sending onboarding email to Acme Corp?",
-  "actions": ["approve", "reject"]
-}
-```
-
----
-
-### Step 7 — Comms Agent
-
-* Send email
-* Send Slack notification
-
----
-
-### Step 8 — Final Output
-
-```json
-{
-  "status": "completed",
-  "summary": {
-    "tasks_created": number,
-    "email_sent": boolean,
-    "slack_sent": boolean
-  }
-}
-```
-
----
-
-# 🧠 Agent Prompt Templates
-
-## Global Rules (apply to all agents)
-
-* Be concise and structured
-* Always return valid JSON
-* Never hallucinate tool results
-* Use provided context only
-
----
-
-## Planner Behavior (Airia)
-
-* Break goal into ordered steps
-* Select correct agents
-* Pass outputs between agents
-
----
-
-## CRM Agent Prompt
-
-"You are a CRM agent. Retrieve structured customer data using the provided tool. Do not infer missing data."
-
----
-
-## Docs Agent Prompt
-
-"You generate onboarding documentation for enterprise customers. Output clean markdown."
-
----
-
-## Ops Agent Prompt
-
-"You create actionable onboarding tasks for internal teams. Tasks must be clear and assignable."
-
----
-
-## Comms Agent Prompt
-
-"You communicate with customers professionally. Email must be clear, concise, and actionable."
-
----
-
-## Governance Agent Prompt
-
-"You enforce enterprise safety rules. Block or require approval when necessary."
-
----
-
-# 🖥️ Frontend Requirements
-
-## Minimal UI
-
-### 1. Input Box
-
-* Accepts goal string
-
----
-
-### 2. Execution Log (LIVE)
-
-Display:
-
-* step name
-* agent name
-* status
-
-Example:
-
-```
-✔ CRM Agent → fetched customer data
-✔ Docs Agent → generated onboarding doc
-✔ Ops Agent → created tasks
-⏳ Awaiting approval...
-```
-
----
-
-### 3. Approval Component
-
-* Show message
-* Buttons:
-
-  * Approve
-  * Reject
-
----
-
-### 4. Final Summary View
-
-* Tasks created
-* Email sent
-* Slack notified
-
----
-
-# 🔌 API Layer (Your App)
-
-## POST /run-workflow
-
-Request:
-
-```json
-{
-  "goal": "Onboard Acme Corp (Enterprise Plan, 200 seats)"
-}
-```
-
-Response:
-
-* stream events OR polling status
-
----
-
-## POST /approve
-
-```json
-{
-  "workflow_id": "string",
-  "decision": "approve" | "reject"
-}
-```
-
----
-
-# 🧪 Mock Services
-
-## CRM
-
-```json
-{
-  "company_name": "Acme Corp",
-  "plan": "Enterprise",
-  "seats": 200,
-  "contact_email": "admin@acme.com"
-}
-```
-
----
-
-## Tasks
-
-* Store in memory or JSON file
-
----
-
-## Email
-
-* Log instead of actually sending (acceptable)
-
----
-
-## Slack
-
-* Webhook or log
-
----
-
-# 🧨 Key Differentiators (MUST IMPLEMENT)
-
-## 1. Visible Agent Orchestration
-
-* Show which agent runs each step
-
----
-
-## 2. Governance Enforcement
-
-* Must block or pause execution
-
----
-
-## 3. Human-in-the-loop
-
-* Required for email sending
-
----
-
-## 4. Real Tool Calls
-
-* Even if mocked
-
----
-
-# ⚡ Optional Enhancements
-
-* Retry failed steps
-* Editable execution plan
-* Agent reasoning trace
-* Persistent memory (Redis)
+## 4. Execution Report
+Comprehensive summary of all actions performed during the workflow.
 
 ---
 
 # 🏁 Success Criteria
 
-* One input triggers full workflow
-* Multiple agents execute in sequence
-* Approval step interrupts flow
-* External actions only after approval
-* UI clearly shows orchestration
-
----
-
-# 🎤 Demo Script (for final submission)
-
-1. Enter onboarding request
-2. Show Airia orchestrating agents
-3. Show live execution logs
-4. Pause at approval
-5. Approve
-6. Show final result
-
----
-
-# 🔥 Final Note
-
-This project MUST emphasize:
-
-* Airia as the orchestrator
-* Agents as first-class entities
-* Real execution across systems
-
-If implemented correctly, this will feel like:
-
-> “An AI employee powered by Airia”
+*   Unified goal input triggers an integrated multi-agent sequence.
+*   Seamless data handoff between specialized agents.
+*   Governance-enforced execution pause for human validation.
+*   Secure, idempotent resource provisioning via the Airia API.
+*   Full observability into the autonomous orchestration process.
