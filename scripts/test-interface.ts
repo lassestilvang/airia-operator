@@ -5,31 +5,24 @@ async function run() {
   const config = getConfig()
   const client = (createAiriaClient(config) as any)
   
-  const crmAgentId = '53536f1f-c267-4046-9114-ccc3981dab42'
+  const testPipelineId = 'dc4e7f88-76a6-4b9a-9934-4a22701d797e'
   
-  console.log(`Testing execution for CRM Agent (${crmAgentId})...`)
-  
-  const formats = [
-    { userInput: 'Onboard Acme Corp' },
-    { userInput: 'Onboard Acme Corp', input: 'Onboard Acme Corp' },
-    { userInput: 'Onboard Acme Corp', prompt: 'Onboard Acme Corp' }
-  ]
-  
-  for (const body of formats) {
-    console.log(`\nFormat: ${JSON.stringify(body)}`)
-    try {
-      const response = await client.request(`/v1/PipelineExecution/${crmAgentId}`, {
-        method: 'POST',
-        body: JSON.stringify({
-          ...body,
-          includeToolsResponse: true,
-          saveHistory: true
-        })
-      })
-      console.log('SUCCESS:', JSON.stringify(response, null, 2))
-    } catch (e: any) {
-      console.log('FAILED')
+  // Try to get the latest execution for this pipeline
+  try {
+    const executions = await client.request(`/v1/PipelineExecution/Pipeline/${testPipelineId}?PageNumber=1&PageSize=1`, { method: 'GET' })
+    if (executions.items && executions.items.length > 0) {
+      const latest = executions.items[0]
+      console.log(`Latest Execution ID: ${latest.id} (Status: ${latest.status})`)
+      
+      // Fetch the full report
+      const report = await client.request(`/v1/PipelineExecution/${latest.id}`, { method: 'GET' })
+      console.log('Full Report Details:')
+      console.log(JSON.stringify(report, null, 2))
+    } else {
+        console.log('No execution history found.')
     }
+  } catch (e: any) {
+    console.log(`Failed to fetch execution history: ${e.message}`)
   }
 }
 
