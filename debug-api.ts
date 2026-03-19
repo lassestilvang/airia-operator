@@ -9,18 +9,24 @@ async function debug() {
   }
 
   const client = createAiriaClient(config)
-  // Access private methods using type casting if necessary, 
-  // but better to just use public if possible or modify client temporarily.
-  // Since I can modify the code, I'll just add a public debug method or use provision.
   
   console.log('Fetching swarms...')
-  // @ts-ignore - accessing private for debug
+  // @ts-ignore
   const swarms = await client.listSwarms()
-  console.log('Swarms found:', JSON.stringify(swarms, null, 2))
+  console.log('Swarms count:', swarms.length)
+  if (swarms.length > 0) console.log('Swarms[0]:', swarms[0])
   
-  const name = 'enterprise_customer_onboarding'
-  const found = swarms.find(s => s.name === name)
-  console.log(`Searching for "${name}":`, found ? 'FOUND' : 'NOT FOUND')
+  console.log('Fetching tools...')
+  // @ts-ignore
+  const tools = await client.listTools()
+  console.log('Tools count:', tools.length)
+  if (tools.length > 0) console.log('Tools[0]:', tools[0])
+
+  console.log('Fetching pipelines...')
+  // @ts-ignore
+  const pipelines = await client.listPipelines()
+  console.log('Pipelines count:', pipelines.length)
+  if (pipelines.length > 0) console.log('Pipelines[0]:', pipelines[0])
 }
 
 debug().catch(console.error)
