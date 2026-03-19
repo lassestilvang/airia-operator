@@ -570,7 +570,7 @@ export function renderAppHtml(): string {
           const details = document.getElementById('approvalDetails')
           if (eventData.data && eventData.data.actions) {
             details.innerHTML = '<ul style="text-align: left; margin: 1rem 0; padding-left: 1.5rem; color: var(--text-muted); font-size: 0.9rem;">' + 
-              eventData.data.actions.map(a => `<li style="margin-bottom: 0.4rem;">${a}</li>`).join('') + 
+              eventData.data.actions.map(a => \`<li style="margin-bottom: 0.4rem;">\${a}</li>\`).join('') + 
               '</ul>'
           } else {
             details.innerHTML = ''
