@@ -159,6 +159,15 @@ export class WorkflowService {
       status: 'running',
       message: `CRM Agent fetching profile for ${companyName}`,
     })
+
+    if (airiaClient.canUseRemote && state.agents.crm) {
+      try {
+        await airiaClient.runPipeline(state.agents.crm, `Fetch customer profile for ${companyName}`)
+      } catch (error) {
+        console.error('Airia CRM Agent execution failed:', error)
+      }
+    }
+
     await sleep(STEP_DELAY_MS)
 
     const profile = findCustomerProfile(companyName)
@@ -190,6 +199,15 @@ export class WorkflowService {
       status: 'running',
       message: 'Docs Agent generating onboarding markdown',
     })
+
+    if (airiaClient.canUseRemote && state.agents.docs) {
+      try {
+        await airiaClient.runPipeline(state.agents.docs, `Generate onboarding documentation for ${profile.company_name} (${profile.plan} plan)`)
+      } catch (error) {
+        console.error('Airia Docs Agent execution failed:', error)
+      }
+    }
+
     await sleep(STEP_DELAY_MS)
 
     const docMarkdown = buildDocMarkdown(profile)
@@ -209,6 +227,15 @@ export class WorkflowService {
       status: 'running',
       message: 'Ops Agent creating onboarding tasks',
     })
+
+    if (airiaClient.canUseRemote && state.agents.ops) {
+      try {
+        await airiaClient.runPipeline(state.agents.ops, `Create onboarding tasks for ${profile.company_name}`)
+      } catch (error) {
+        console.error('Airia Ops Agent execution failed:', error)
+      }
+    }
+
     await sleep(STEP_DELAY_MS)
 
     const tasks = buildOpsTasks(profile)
@@ -229,6 +256,15 @@ export class WorkflowService {
       status: 'running',
       message: 'Governance Agent validating external email action',
     })
+
+    if (airiaClient.canUseRemote && state.agents.governance) {
+      try {
+        await airiaClient.runPipeline(state.agents.governance, `Validate if external onboarding email can be sent to ${profile.contact_email} for ${profile.company_name}`)
+      } catch (error) {
+        console.error('Airia Governance Agent execution failed:', error)
+      }
+    }
+
     await sleep(STEP_DELAY_MS)
 
     setWorkflowApprovalState(workflowId, true)
@@ -244,15 +280,6 @@ export class WorkflowService {
         contact_email: profile.contact_email,
       },
     })
-
-    if (airiaClient.canUseRemote && state.agents.crm) {
-      try {
-        const run = await airiaClient.runPipeline(state.agents.crm, `Fetch onboarding profile for ${profile.company_name}`)
-        setWorkflowExecutionId(workflowId, run.executionId)
-      } catch {
-        // Best-effort Airia execution hook for hackathon demo.
-      }
-    }
   }
 
   approve(workflowId: string, decision: ApprovalDecision): WorkflowResponse {
@@ -301,6 +328,16 @@ export class WorkflowService {
       agent: 'comms',
       status: 'running',
       message: 'Comms Agent sending email + slack notification',
+    })
+
+    // Execute Comms agent in Airia
+    const airiaClient = createAiriaClient(this.config)
+    loadAiriaState().then((state) => {
+      if (airiaClient.canUseRemote && state.agents.comms) {
+        airiaClient.runPipeline(state.agents.comms, `Send onboarding guide and Slack notification for ${profile.company_name}`).catch((error) => {
+          console.error('Airia Comms Agent execution failed:', error)
+        })
+      }
     })
 
     addToolLog('email', {
