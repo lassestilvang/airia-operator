@@ -4,6 +4,10 @@ import type { AppConfig } from '../types/index.js'
 
 type JsonObject = Record<string, unknown>
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 export interface AiriaToolSpec {
   key: string
   payload: JsonObject
@@ -54,6 +58,7 @@ class AiriaClient {
 
     if (!response.ok) {
       const text = await response.text()
+      console.error(`Airia API Error [${response.status}] ${path}:`, text)
       throw new Error(`Airia API ${path} failed (${response.status}): ${text}`)
     }
 
@@ -257,10 +262,10 @@ class AiriaClient {
     return { swarmId: existing.id, name: existing.name }
   }
 
-  private async deleteResources(): Promise<void> {
+  private async cleanupAll(): Promise<void> {
     const projectId = this.config.airiaProjectId ? `&ProjectId=${this.config.airiaProjectId}` : ''
     
-    // Delete Swarms
+    // 1. Delete Swarms
     const swarms = await this.listSwarms()
     for (const swarm of swarms) {
       if (swarm.name === 'enterprise_customer_onboarding') {
@@ -268,16 +273,28 @@ class AiriaClient {
       }
     }
 
-    // Delete Pipelines
+    // 2. Delete Pipelines
     const pipelines = await this.listPipelines()
-    const names = ['CRM Agent', 'Docs Agent', 'Ops Agent', 'Comms Agent', 'Governance Agent']
+    const names = ['CRM Agent', 'Docs Agent', 'Ops Agent', 'Comms Agent', 'Governance Agent', 'Test Agent']
     for (const pipeline of pipelines) {
       if (names.includes(pipeline.name ?? '')) {
         await this.request(`/v1/PipelinesConfig/${pipeline.id}`, { method: 'DELETE' }).catch(() => {})
       }
     }
 
-    // Delete Tools
+    // 3. Delete Agent Cards
+    try {
+      const cards = await this.request<Array<{ agentCardId: string; name: string }>>(`/v1/AgentCard?PageNumber=1&PageSize=200${projectId}`, { method: 'GET' })
+      for (const card of cards) {
+        if (names.includes(card.name)) {
+          await this.request(`/v1/AgentCard/${card.agentCardId}`, { method: 'DELETE' }).catch(() => {})
+        }
+      }
+    } catch (e) {
+      // Endpoint might not exist or list differently
+    }
+
+    // 4. Delete Tools
     const tools = await this.listTools()
     const toolNames = ['mock-crm', 'mock-tasks', 'send-email', 'send-slack']
     for (const tool of tools) {
@@ -288,8 +305,11 @@ class AiriaClient {
   }
 
   async provision(args: { tools: AiriaToolSpec[]; agents: AiriaAgentSpec[]; workflowName: string }): Promise<AiriaProvisionResult> {
-    console.log('Cleaning up existing Airia resources...')
-    await this.deleteResources()
+    console.log('Performing deep cleanup of Airia resources...')
+    // Try cleanup a few times to ensure everything is gone
+    await this.cleanupAll().catch(() => {})
+    await sleep(1000)
+    await this.cleanupAll().catch(() => {})
 
     console.log('Provisioning new Airia resources...')
     const toolEntries = await Promise.all(
@@ -297,6 +317,7 @@ class AiriaClient {
         const payload = {
           ...tool.payload,
           projectId: this.config.airiaProjectId,
+          routeThroughACC: false, // Ensure direct access via tunnel
         }
         const created = await this.request<{ id: string }>('/v1/Tools', {
           method: 'POST',
@@ -313,7 +334,8 @@ class AiriaClient {
 
     const agentEntries = await Promise.all(
       args.agents.map(async (agent) => {
-        const id = await this.upsertAgent(agent, tools)
+        // Always create a new assistant (Agent Card + Pipeline)
+        const id = await this.createAssistantFromSpec(agent, tools)
         return [agent.key, id] as const
       }),
     )
@@ -330,7 +352,7 @@ class AiriaClient {
         userInput: goal,
         asyncOutput: false,
         includeToolsResponse: true,
-        saveHistory: false,
+        saveHistory: true,
       }),
     })
 
