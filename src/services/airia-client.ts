@@ -91,9 +91,11 @@ class AiriaClient {
   }
 
   private async listPipelines(): Promise<Array<{ id: string; name?: string }>> {
-    return await this.request<Array<{ id: string; name?: string }>>('/v1/PipelinesConfig?PageNumber=1&PageSize=200', {
-      method: 'GET',
-    })
+    const page = await this.request<{ items?: Array<{ id: string; name?: string }> }>(
+      '/v1/PipelinesConfig?PageNumber=1&PageSize=200',
+      { method: 'GET' },
+    )
+    return page.items ?? []
   }
 
   private async createAssistantFromSpec(spec: AiriaAgentSpec): Promise<string> {
@@ -147,9 +149,11 @@ class AiriaClient {
   }
 
   private async listSwarms(): Promise<Array<{ id: string; name: string; members?: Array<{ pipelineId: string }> }>> {
-    return await this.request<Array<{ id: string; name: string; members?: Array<{ pipelineId: string }> }>>('/v1/AgentSwarms', {
-      method: 'GET',
-    })
+    const page = await this.request<{ items?: Array<{ id: string; name: string; members?: Array<{ pipelineId: string }> }> }>(
+      '/v1/AgentSwarms?PageNumber=1&PageSize=200',
+      { method: 'GET' },
+    )
+    return page.items ?? []
   }
 
   private async ensureSwarmMembership(swarmId: string, pipelineIds: string[]): Promise<void> {
