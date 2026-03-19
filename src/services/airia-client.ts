@@ -14,6 +14,7 @@ export interface AiriaAgentSpec {
   name: string
   description: string
   prompt: string
+  tools?: string[]
 }
 
 export interface AiriaProvisionResult {
@@ -105,7 +106,7 @@ class AiriaClient {
     return page.items ?? []
   }
 
-  private async createAssistantFromSpec(spec: AiriaAgentSpec): Promise<string> {
+  private async createAssistantFromSpec(spec: AiriaAgentSpec, toolIds: Record<string, string>): Promise<string> {
     const modelsPage = await this.request<{ items?: Array<{ id: string }> }>('/v1/Models?PageNumber=1&PageSize=1', {
       method: 'GET',
     })
@@ -115,6 +116,11 @@ class AiriaClient {
       throw new Error('No models available to create assistant')
     }
 
+    const skills = (spec.tools ?? [])
+      .map((toolKey) => toolIds[toolKey])
+      .filter(Boolean)
+      .map((skillId) => ({ skillId }))
+
     const payload = [
       {
         projectId: this.config.airiaProjectId ?? '',
@@ -123,7 +129,7 @@ class AiriaClient {
         instructions: spec.prompt,
         modelId,
         version: '1.0.0',
-        skills: [],
+        skills,
         modalities: ['text'],
         defaultInputModes: ['text'],
         defaultOutputModes: ['text'],
@@ -146,13 +152,29 @@ class AiriaClient {
     return first.createdAgentId
   }
 
-  private async upsertAgent(spec: AiriaAgentSpec): Promise<string> {
+  private async upsertAgent(spec: AiriaAgentSpec, toolIds: Record<string, string>): Promise<string> {
     const pipelines = await this.listPipelines()
     const existing = pipelines.find((pipeline) => pipeline.name === spec.name)
 
     if (!existing) {
-      return this.createAssistantFromSpec(spec)
+      return this.createAssistantFromSpec(spec, toolIds)
     }
+
+    // Fetch existing detail to preserve steps and other config
+    const detail = await this.request<{ activeVersion?: { steps: any[]; alignment: string } }>(
+      `/v1/PipelinesConfig/${existing.id}`,
+      { method: 'GET' },
+    )
+
+    const modelsPage = await this.request<{ items?: Array<{ id: string }> }>('/v1/Models?PageNumber=1&PageSize=1', {
+      method: 'GET',
+    })
+    const modelId = modelsPage.items?.[0]?.id
+
+    const skills = (spec.tools ?? [])
+      .map((toolKey) => toolIds[toolKey])
+      .filter(Boolean)
+      .map((skillId) => ({ skillId }))
 
     await this.request(`/v1/PipelinesConfig/${existing.id}`, {
       method: 'PUT',
@@ -160,7 +182,12 @@ class AiriaClient {
         id: existing.id,
         name: spec.name,
         description: spec.description,
+        instructions: spec.prompt,
+        modelId,
         projectId: this.config.airiaProjectId,
+        skills,
+        steps: detail.activeVersion?.steps ?? [],
+        alignment: detail.activeVersion?.alignment ?? 'Vertical',
       }),
     })
     return existing.id
@@ -233,7 +260,7 @@ class AiriaClient {
 
     const agentEntries = await Promise.all(
       args.agents.map(async (agent) => {
-        const id = await this.upsertAgent(agent)
+        const id = await this.upsertAgent(agent, tools)
         return [agent.key, id] as const
       }),
     )
