@@ -119,111 +119,71 @@ class AiriaClient {
         Description: t.description
       }))
 
-    console.log(`Creating Agent Card for ${spec.name}...`)
+    console.log(`Creating Pipeline for ${spec.name}...`)
     
-    // 1. Create the Agent Card first
-    const cardPayload = [
-      {
-        projectId: this.config.airiaProjectId ?? '',
-        name: spec.name,
-        description: spec.description,
-        instructions: spec.prompt,
-        modelId,
-        version: '1.0.0',
-        skills,
-        modalities: ['text'],
-        defaultInputModes: ['text'],
-        defaultOutputModes: ['text'],
-        userAgent: 'AiriaAutoOperator/1.0',
-      },
-    ]
-
-    const cardResult = await this.request<Array<{ success: boolean; createdAgentId: string; errorMessage?: string }>>(
-      '/v1/AgentCard',
-      {
-        method: 'POST',
-        body: JSON.stringify(cardPayload),
-      },
-    )
-
-    if (!cardResult[0]?.success) {
-      throw new Error(`Failed to create agent card: ${cardResult[0]?.errorMessage}`)
-    }
-
-    const agentCardId = cardResult[0].createdAgentId
-
-    // Sometimes the backend auto-creates a pipeline. Let's see if it did and delete it
-    // so we can build our own correctly wired one.
-    await sleep(2000)
-    const pipelines = await this.listPipelines()
-    const autoPipeline = pipelines.find(p => p.name === spec.name)
-    if (autoPipeline) {
-        await this.request(`/v1/PipelinesConfig/${autoPipeline.id}`, { method: 'DELETE' }).catch(() => {})
-    }
-
-    console.log(`Creating correctly wired Pipeline for ${spec.name}...`)
-    
-    // 2. Create the Pipeline explicitly using agentCardStep
     const inputStepId = randomUUID()
-    const agentStepId = randomUUID()
+    const assistantStepId = randomUUID()
     const outputStepId = randomUUID()
     
-    // Create handles for wiring
     const inputSourceHandle = randomUUID()
-    const agentTargetHandle = randomUUID()
-    const agentSourceHandle = randomUUID()
+    const assistantTargetHandle = randomUUID()
+    const assistantSourceHandle = randomUUID()
     const outputTargetHandle = randomUUID()
 
     const pipelinePayload = {
-      name: spec.name,
-      description: spec.description,
-      projectId: this.config.airiaProjectId ?? '00000000-0000-0000-0000-000000000000',
-      alignment: 'Vertical',
-      steps: [
-        {
-          id: inputStepId,
-          stepType: 'inputStep',
-          stepTitle: 'Input',
-          handles: [
-            { id: randomUUID(), type: 'source', uuid: inputSourceHandle }
-          ],
-          dependenciesObject: []
-        },
-        {
-          id: agentStepId,
-          stepType: 'agentCardStep',
-          stepTitle: 'Agent Card',
-          agentCardId: agentCardId,
-          handles: [
-            { id: randomUUID(), type: 'target', uuid: agentTargetHandle },
-            { id: randomUUID(), type: 'source', uuid: agentSourceHandle }
-          ],
-          dependenciesObject: [
-            {
-              parentId: inputStepId,
-              parentHandleId: inputSourceHandle,
-              handleId: agentTargetHandle,
-              id: randomUUID()
-            }
-          ]
-        },
-        {
-          id: outputStepId,
-          stepType: 'outputStep',
-          stepTitle: 'Output',
-          handles: [
-            { id: randomUUID(), type: 'target', uuid: outputTargetHandle }
-          ],
-          dependenciesObject: [
-            {
-              parentId: agentStepId,
-              parentHandleId: agentSourceHandle,
-              handleId: outputTargetHandle,
-              id: randomUUID()
-            }
-          ]
-        }
-      ]
+      pipelineRequest: {
+        name: spec.name,
+        description: spec.description,
+        projectId: this.config.airiaProjectId ?? '00000000-0000-0000-0000-000000000000',
+        alignment: 'Vertical',
+        steps: [
+          {
+            id: inputStepId,
+            stepType: 'InputStep',
+            stepTitle: 'Input',
+            handles: [
+              { id: randomUUID(), type: 'source', uuid: inputSourceHandle }
+            ],
+            dependenciesObject: []
+          },
+          {
+            id: assistantStepId,
+            stepType: 'AssistantStep',
+            stepTitle: 'Assistant',
+            instructions: spec.prompt,
+            modelId,
+            skills,
+            handles: [
+              { id: randomUUID(), type: 'target', uuid: assistantTargetHandle },
+              { id: randomUUID(), type: 'source', uuid: assistantSourceHandle }
+            ],
+            dependenciesObject: [
+              {
+                parentId: inputStepId,
+                parentHandleId: inputSourceHandle,
+                handleId: assistantTargetHandle,
+                id: randomUUID()
+              }
+            ]
+          },
+          {
+            id: outputStepId,
+            stepType: 'OutputStep',
+            stepTitle: 'Output',
+            handles: [
+              { id: randomUUID(), type: 'target', uuid: outputTargetHandle }
+            ],
+            dependenciesObject: [
+              {
+                parentId: assistantStepId,
+                parentHandleId: assistantSourceHandle,
+                handleId: outputTargetHandle,
+                id: randomUUID()
+              }
+            ]
+          }
+        ]
+      }
     }
 
     const result = await this.request<{ id: string }>('/v1/PipelinesConfig', {
@@ -231,7 +191,7 @@ class AiriaClient {
       body: JSON.stringify(pipelinePayload),
     })
 
-    console.log(`Pipeline successfully wired for ${spec.name}. Result ID: ${result.id}`)
+    console.log(`Pipeline successfully created for ${spec.name}. Result ID: ${result.id}`)
     return result.id
   }
 
