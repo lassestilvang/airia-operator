@@ -1,0 +1,43 @@
+{
+  "name": "airia-operator",
+  "version": "1.0.0",
+  "description": "Airia Auto-Operator hackathon demo",
+  "main": "dist/server/index.js",
+  "scripts": {
+    "dev": "tsx src/server/index.ts",
+    "dev:watch": "tsx watch src/server/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server/index.js",
+    "typecheck": "tsc --noEmit",
+    "bootstrap": "tsx scripts/bootstrap.ts",
+    "demo:up": "tsx scripts/demo-up.ts",
+    "demo:reset": "tsx scripts/demo-reset.ts",
+    "test": "echo \"No automated tests yet - run npm run demo:up for smoke validation\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lassestilvang/airia-operator.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/lassestilvang/airia-operator/issues"
+  },
+  "homepage": "https://github.com/lassestilvang/airia-operator#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
