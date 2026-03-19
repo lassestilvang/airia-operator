@@ -4,7 +4,7 @@ export function renderAppHtml(): string {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Airia Auto-Operator Demo</title>
+    <title>Airia Autonomous Operator</title>
     <style>
       :root {
         --bg: #0e1a21;
@@ -147,7 +147,7 @@ export function renderAppHtml(): string {
         <div class="row">
           <input id="goalInput" value="Onboard Acme Corp (Enterprise Plan, 200 seats)" />
           <button class="primary" id="runButton">Run Workflow</button>
-          <button class="secondary" id="resetButton">Reset Demo State</button>
+          <button class="secondary" id="resetButton">Clear Operational State</button>
         </div>
       </section>
 
@@ -292,7 +292,7 @@ export function renderAppHtml(): string {
       approveBtn.addEventListener('click', () => handleApproval('approve'))
       rejectBtn.addEventListener('click', () => handleApproval('reject'))
       resetButton.addEventListener('click', async () => {
-        await fetch('/api/demo/reset', { method: 'POST' })
+        await fetch('/api/system/reset', { method: 'POST' })
         if (source) source.close()
         source = null
         currentWorkflowId = null
