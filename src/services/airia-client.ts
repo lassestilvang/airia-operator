@@ -132,7 +132,14 @@ class AiriaClient {
         skills,
         modalities: ['text'],
         defaultInputModes: ['text'],
-        defaultOutputModes: ['text']
+        defaultOutputModes: ['text'],
+        supportedInterfaces: [
+          {
+            Url: "https://api.airia.ai",
+            ProtocolBinding: "Chat",
+            ProtocolVersion: "1.0"
+          }
+        ]
       },
     ]
 
