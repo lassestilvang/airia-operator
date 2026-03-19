@@ -139,6 +139,7 @@ export function buildAgentSpecs(): AiriaAgentSpec[] {
       name: 'CRM Agent',
       description: 'Retrieve structured customer data using CRM tools.',
       prompt: 'You are a CRM agent. Retrieve structured customer data using the provided tool. Do not infer missing data.',
+      tools: ['mock-crm'],
     },
     {
       key: 'docs',
@@ -151,12 +152,14 @@ export function buildAgentSpecs(): AiriaAgentSpec[] {
       name: 'Ops Agent',
       description: 'Create actionable onboarding tasks for internal teams.',
       prompt: 'You create actionable onboarding tasks for internal teams. Tasks must be clear and assignable.',
+      tools: ['mock-tasks'],
     },
     {
       key: 'comms',
       name: 'Comms Agent',
       description: 'Send professional external and internal communications.',
       prompt: 'You communicate with customers professionally. Email must be clear, concise, and actionable.',
+      tools: ['send-email', 'send-slack'],
     },
     {
       key: 'governance',
