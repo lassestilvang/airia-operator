@@ -106,7 +106,7 @@ class AiriaClient {
     return page.items ?? []
   }
 
-  private async createAssistantFromSpec(spec: AiriaAgentSpec, toolIds: Record<string, string>): Promise<string> {
+  private async createAssistantFromSpec(spec: AiriaAgentSpec, tools: Record<string, { id: string; name: string; description: string }>): Promise<string> {
     const modelsPage = await this.request<{ items?: Array<{ id: string }> }>('/v1/Models?PageNumber=1&PageSize=1', {
       method: 'GET',
     })
@@ -117,9 +117,13 @@ class AiriaClient {
     }
 
     const skills = (spec.tools ?? [])
-      .map((toolKey) => toolIds[toolKey])
+      .map((toolKey) => tools[toolKey])
       .filter(Boolean)
-      .map((skillId) => ({ skillId }))
+      .map((t) => ({ 
+        id: t.id,
+        name: t.name,
+        description: t.description
+      }))
 
     const payload = [
       {
@@ -152,12 +156,12 @@ class AiriaClient {
     return first.createdAgentId
   }
 
-  private async upsertAgent(spec: AiriaAgentSpec, toolIds: Record<string, string>): Promise<string> {
+  private async upsertAgent(spec: AiriaAgentSpec, tools: Record<string, { id: string; name: string; description: string }>): Promise<string> {
     const pipelines = await this.listPipelines()
     const existing = pipelines.find((pipeline) => pipeline.name === spec.name)
 
     if (!existing) {
-      return this.createAssistantFromSpec(spec, toolIds)
+      return this.createAssistantFromSpec(spec, tools)
     }
 
     // Fetch existing detail to preserve steps and other config
@@ -172,9 +176,13 @@ class AiriaClient {
     const modelId = modelsPage.items?.[0]?.id
 
     const skills = (spec.tools ?? [])
-      .map((toolKey) => toolIds[toolKey])
+      .map((toolKey) => tools[toolKey])
       .filter(Boolean)
-      .map((skillId) => ({ skillId }))
+      .map((t) => ({ 
+        id: t.id,
+        name: t.name,
+        description: t.description
+      }))
 
     await this.request(`/v1/PipelinesConfig/${existing.id}`, {
       method: 'PUT',
@@ -249,11 +257,56 @@ class AiriaClient {
     return { swarmId: existing.id, name: existing.name }
   }
 
+  private async deleteResources(): Promise<void> {
+    const projectId = this.config.airiaProjectId ? `&ProjectId=${this.config.airiaProjectId}` : ''
+    
+    // Delete Swarms
+    const swarms = await this.listSwarms()
+    for (const swarm of swarms) {
+      if (swarm.name === 'enterprise_customer_onboarding') {
+        await this.request(`/v1/AgentSwarms/${swarm.id}`, { method: 'DELETE' }).catch(() => {})
+      }
+    }
+
+    // Delete Pipelines
+    const pipelines = await this.listPipelines()
+    const names = ['CRM Agent', 'Docs Agent', 'Ops Agent', 'Comms Agent', 'Governance Agent']
+    for (const pipeline of pipelines) {
+      if (names.includes(pipeline.name ?? '')) {
+        await this.request(`/v1/PipelinesConfig/${pipeline.id}`, { method: 'DELETE' }).catch(() => {})
+      }
+    }
+
+    // Delete Tools
+    const tools = await this.listTools()
+    const toolNames = ['mock-crm', 'mock-tasks', 'send-email', 'send-slack']
+    for (const tool of tools) {
+      if (toolNames.includes(tool.name ?? '')) {
+        await this.request(`/v1/Tools/${tool.id}`, { method: 'DELETE' }).catch(() => {})
+      }
+    }
+  }
+
   async provision(args: { tools: AiriaToolSpec[]; agents: AiriaAgentSpec[]; workflowName: string }): Promise<AiriaProvisionResult> {
+    console.log('Cleaning up existing Airia resources...')
+    await this.deleteResources()
+
+    console.log('Provisioning new Airia resources...')
     const toolEntries = await Promise.all(
       args.tools.map(async (tool) => {
-        const id = await this.upsertTool(tool)
-        return [tool.key, id] as const
+        const payload = {
+          ...tool.payload,
+          projectId: this.config.airiaProjectId,
+        }
+        const created = await this.request<{ id: string }>('/v1/Tools', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        })
+        return [tool.key, { 
+          id: created.id, 
+          name: tool.payload.name as string, 
+          description: tool.payload.description as string 
+        }] as const
       }),
     )
     const tools = Object.fromEntries(toolEntries)
@@ -267,7 +320,7 @@ class AiriaClient {
     const agents = Object.fromEntries(agentEntries)
 
     const workflow = await this.upsertWorkflowSwarm(args.workflowName, Object.values(agents))
-    return { tools, agents, workflow }
+    return { tools: Object.fromEntries(Object.entries(tools).map(([k, v]) => [k, v.id])), agents, workflow }
   }
 
   async runPipeline(pipelineId: string, goal: string): Promise<AiriaRunResult> {
