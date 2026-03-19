@@ -119,80 +119,48 @@ class AiriaClient {
         Description: t.description
       }))
 
-    console.log(`Creating Pipeline for ${spec.name}...`)
+    console.log(`Creating Agent Card for ${spec.name}...`)
     
-    const inputStepId = randomUUID()
-    const assistantStepId = randomUUID()
-    const outputStepId = randomUUID()
-    
-    const inputSourceHandle = randomUUID()
-    const assistantTargetHandle = randomUUID()
-    const assistantSourceHandle = randomUUID()
-    const outputTargetHandle = randomUUID()
-
-    const pipelinePayload = {
-      pipelineRequest: {
+    const cardPayload = [
+      {
+        projectId: this.config.airiaProjectId ?? '',
         name: spec.name,
         description: spec.description,
-        projectId: this.config.airiaProjectId ?? '00000000-0000-0000-0000-000000000000',
-        alignment: 'Vertical',
-        steps: [
-          {
-            id: inputStepId,
-            stepType: 'InputStep',
-            stepTitle: 'Input',
-            handles: [
-              { id: randomUUID(), type: 'source', uuid: inputSourceHandle }
-            ],
-            dependenciesObject: []
-          },
-          {
-            id: assistantStepId,
-            stepType: 'AssistantStep',
-            stepTitle: 'Assistant',
-            instructions: spec.prompt,
-            modelId,
-            skills,
-            handles: [
-              { id: randomUUID(), type: 'target', uuid: assistantTargetHandle },
-              { id: randomUUID(), type: 'source', uuid: assistantSourceHandle }
-            ],
-            dependenciesObject: [
-              {
-                parentId: inputStepId,
-                parentHandleId: inputSourceHandle,
-                handleId: assistantTargetHandle,
-                id: randomUUID()
-              }
-            ]
-          },
-          {
-            id: outputStepId,
-            stepType: 'OutputStep',
-            stepTitle: 'Output',
-            handles: [
-              { id: randomUUID(), type: 'target', uuid: outputTargetHandle }
-            ],
-            dependenciesObject: [
-              {
-                parentId: assistantStepId,
-                parentHandleId: assistantSourceHandle,
-                handleId: outputTargetHandle,
-                id: randomUUID()
-              }
-            ]
-          }
-        ]
-      }
+        instructions: spec.prompt,
+        modelId,
+        version: '1.0.0',
+        skills,
+        modalities: ['text'],
+        defaultInputModes: ['text'],
+        defaultOutputModes: ['text']
+      },
+    ]
+
+    const cardResult = await this.request<Array<{ success: boolean; createdAgentId: string; errorMessage?: string }>>(
+      '/v1/AgentCard',
+      {
+        method: 'POST',
+        body: JSON.stringify(cardPayload),
+      },
+    )
+
+    if (!cardResult[0]?.success) {
+      throw new Error(`Failed to create agent card: ${cardResult[0]?.errorMessage}`)
     }
 
-    const result = await this.request<{ id: string }>('/v1/PipelinesConfig', {
-      method: 'POST',
-      body: JSON.stringify(pipelinePayload),
-    })
+    const agentCardId = cardResult[0].createdAgentId
 
-    console.log(`Pipeline successfully created for ${spec.name}. Result ID: ${result.id}`)
-    return result.id
+    await sleep(2000)
+    const pipelines = await this.listPipelines()
+    const autoPipeline = pipelines.find(p => p.name === spec.name)
+    
+    if (autoPipeline) {
+        console.log(`Found linked Pipeline for ${spec.name}: ${autoPipeline.id}`)
+        return autoPipeline.id
+    }
+
+    console.warn(`Could not find auto-generated pipeline for ${spec.name}, returning Agent Card ID.`)
+    return agentCardId
   }
 
   private async listSwarms(): Promise<Array<{ id: string; name: string; members?: Array<{ pipelineId: string }> }>> {
