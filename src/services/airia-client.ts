@@ -346,19 +346,39 @@ class AiriaClient {
   }
 
   async runPipeline(pipelineId: string, goal: string): Promise<AiriaRunResult> {
-    const result = await this.request<{ executionId?: string }>(`/v1/PipelineExecution/${pipelineId}`, {
+    const run = await this.request<{ executionId: string }>(`/v1/PipelineExecution/${pipelineId}`, {
       method: 'POST',
       body: JSON.stringify({
         userInput: goal,
-        asyncOutput: false,
+        asyncOutput: true,
         includeToolsResponse: true,
         saveHistory: true,
       }),
     })
 
-    return {
-      executionId: result.executionId ?? randomUUID(),
+    const executionId = run.executionId
+
+    // Poll for completion
+    let attempts = 0
+    const maxAttempts = 30
+    while (attempts < maxAttempts) {
+      const report = await this.request<{ status: string }>(`/v1/PipelineExecution/${executionId}`, {
+        method: 'GET',
+      })
+
+      if (report.status === 'Completed') {
+        return { executionId }
+      }
+
+      if (report.status === 'Failed') {
+        throw new Error(`Pipeline execution ${executionId} failed`)
+      }
+
+      await sleep(2000)
+      attempts++
     }
+
+    return { executionId }
   }
 }
 
