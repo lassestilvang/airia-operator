@@ -47,7 +47,8 @@ class AiriaClient {
     }
 
     const separator = path.includes('?') ? '&' : '?'
-    const projectIdParam = this.config.airiaProjectId ? `${separator}ProjectId=${this.config.airiaProjectId}` : ''
+    const hasProjectId = path.includes('ProjectId=')
+    const projectIdParam = (this.config.airiaProjectId && !hasProjectId) ? `${separator}ProjectId=${this.config.airiaProjectId}` : ''
     const url = `${this.config.airiaApiBaseUrl}${path}${projectIdParam}`
 
     const response = await fetch(url, {
@@ -90,10 +91,20 @@ class AiriaClient {
   }
 
   private async createAssistantFromSpec(spec: AiriaAgentSpec, tools: Record<string, { id: string; name: string; description: string }>): Promise<string> {
+    // Marketplace models listing
     const modelsPage = await this.request<{ items?: Array<{ id: string }> }>('/v1/Models?PageNumber=1&PageSize=50', {
       method: 'GET',
     })
-    const modelId = modelsPage.items?.[0]?.id
+    
+    let modelId = modelsPage.items?.[0]?.id
+
+    if (!modelId) {
+      // Fallback to library models if project-specific models are empty
+      const libraryModels = await this.request<{ items?: Array<{ id: string }> }>('/marketplace/v1/Library/models?PageNumber=1&PageSize=50', {
+        method: 'GET'
+      })
+      modelId = libraryModels.items?.[0]?.id
+    }
 
     if (!modelId) {
       throw new Error('No models available to create assistant')
@@ -139,7 +150,8 @@ class AiriaClient {
       throw new Error(`Failed to create agent card for ${spec.name}: ${first?.errorMessage ?? 'Unknown error'}`)
     }
 
-    // Wait longer for background pipeline creation
+    console.log(`Agent Card created for ${spec.name}. Result ID: ${first.createdAgentId}`)
+    
     await sleep(2000)
     const pipelines = await this.listPipelines()
     const found = pipelines.find(p => p.name === spec.name)
