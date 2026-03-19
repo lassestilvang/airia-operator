@@ -2,3 +2,6 @@ node_modules
 dist
 .env
 .airia-state.json
+
+.env*
+!.env.example
