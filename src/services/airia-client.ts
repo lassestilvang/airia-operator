@@ -168,11 +168,11 @@ class AiriaClient {
 
   private async listSwarms(): Promise<Array<{ id: string; name: string; members?: Array<{ pipelineId: string }> }>> {
     const projectId = this.config.airiaProjectId ? `&ProjectId=${this.config.airiaProjectId}` : ''
-    const page = await this.request<{ items?: Array<{ id: string; name: string; members?: Array<{ pipelineId: string }> }> }>(
+    const response = await this.request<Array<{ id: string; name: string; members?: Array<{ pipelineId: string }> }>>(
       `/v1/AgentSwarms?PageNumber=1&PageSize=200${projectId}`,
       { method: 'GET' },
     )
-    return page.items ?? []
+    return response ?? []
   }
 
   private async ensureSwarmMembership(swarmId: string, pipelineIds: string[]): Promise<void> {
