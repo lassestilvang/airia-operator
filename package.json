@@ -1,7 +1,7 @@
 {
   "name": "airia-operator",
   "version": "1.0.0",
-  "description": "Airia Auto-Operator hackathon demo",
+  "description": "Airia Autonomous Enterprise Operator",
   "main": "dist/server/index.js",
   "scripts": {
     "dev": "tsx src/server/index.ts",
@@ -10,22 +10,22 @@
     "start": "node dist/server/index.js",
     "typecheck": "tsc --noEmit",
     "bootstrap": "tsx scripts/bootstrap.ts",
-    "demo:up": "tsx scripts/demo-up.ts",
-    "demo:reset": "tsx scripts/demo-reset.ts",
-    "test": "echo \"No automated tests yet - run npm run demo:up for smoke validation\""
+    "operator:up": "tsx scripts/up.ts",
+    "operator:reset": "tsx scripts/reset.ts",
+    "test": "echo \"No automated tests yet\""
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lassestilvang/airia-operator.git"
   },
-  "keywords": [],
+  "keywords": [
+    "airia",
+    "agent-orchestration",
+    "autonomous-operator"
+  ],
   "author": "",
   "license": "ISC",
   "type": "module",
-  "bugs": {
-    "url": "https://github.com/lassestilvang/airia-operator/issues"
-  },
-  "homepage": "https://github.com/lassestilvang/airia-operator#readme",
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
