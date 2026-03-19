@@ -5,7 +5,7 @@ async function run() {
   const config = getConfig()
   const client = (createAiriaClient(config) as any)
   
-  const executionId = '7519fd8f-14db-4938-972d-ca2dc0ea2198' // from your last run
+  const executionId = 'ebea2702-74f9-442e-b77d-d7041d8454c5' // from your last run
   
   console.log(`Fetching report for ${executionId}...`)
   try {
