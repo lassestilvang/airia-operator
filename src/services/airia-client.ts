@@ -46,10 +46,19 @@ class AiriaClient {
       throw new Error('AIRIA_API_KEY is not set')
     }
 
-    const separator = path.includes('?') ? '&' : '?'
-    const hasProjectId = path.includes('ProjectId=')
-    const projectIdParam = (this.config.airiaProjectId && !hasProjectId) ? `${separator}ProjectId=${this.config.airiaProjectId}` : ''
-    const url = `${this.config.airiaApiBaseUrl}${path}${projectIdParam}`
+    let cleanPath = path
+    let skipProjectId = false
+    if (path.includes('skipProjectId=true')) {
+      skipProjectId = true
+      cleanPath = path.replace(/[?&]skipProjectId=true/, (match) => {
+        return match.startsWith('?') ? '?' : ''
+      }).replace(/\?$/, '')
+    }
+
+    const separator = cleanPath.includes('?') ? '&' : '?'
+    const hasProjectId = cleanPath.includes('ProjectId=')
+    const projectIdParam = (this.config.airiaProjectId && !hasProjectId && !skipProjectId) ? `${separator}ProjectId=${this.config.airiaProjectId}` : ''
+    const url = `${this.config.airiaApiBaseUrl}${cleanPath}${projectIdParam}`
 
     const response = await fetch(url, {
       ...init,
@@ -91,20 +100,12 @@ class AiriaClient {
   }
 
   private async createAssistantFromSpec(spec: AiriaAgentSpec, tools: Record<string, { id: string; name: string; description: string }>): Promise<string> {
-    // Marketplace models listing
-    const modelsPage = await this.request<{ items?: Array<{ id: string }> }>('/v1/Models?PageNumber=1&PageSize=50', {
+    // List models without ProjectId filter to ensure we find global/default models
+    const modelsPage = await this.request<{ items?: Array<{ id: string }> }>('/v1/Models?PageNumber=1&PageSize=50&skipProjectId=true', {
       method: 'GET',
     })
     
-    let modelId = modelsPage.items?.[0]?.id
-
-    if (!modelId) {
-      // Fallback to library models if project-specific models are empty
-      const libraryModels = await this.request<{ items?: Array<{ id: string }> }>('/marketplace/v1/Library/models?PageNumber=1&PageSize=50', {
-        method: 'GET'
-      })
-      modelId = libraryModels.items?.[0]?.id
-    }
+    const modelId = modelsPage.items?.[0]?.id
 
     if (!modelId) {
       throw new Error('No models available to create assistant')
@@ -273,6 +274,7 @@ class AiriaClient {
     console.log('Performing deep cleanup of Airia resources...')
     await this.cleanupAll().catch(() => {})
     await sleep(1000)
+    await this.cleanupAll().catch(() => {})
 
     console.log('Provisioning new Airia resources...')
     const toolEntries = await Promise.all(
