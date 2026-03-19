@@ -31,10 +31,10 @@ graph TD
         E <--> G
         
         subgraph Tools ["Local Tool Endpoints"]
-            T1[/api/tools/crm]
-            T2[/api/tools/tasks]
-            T3[/api/tools/email]
-            T4[/api/tools/slack]
+            T1["/api/tools/crm"]
+            T2["/api/tools/tasks"]
+            T3["/api/tools/email"]
+            T4["/api/tools/slack"]
         end
     end
 
