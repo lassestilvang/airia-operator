@@ -21,7 +21,7 @@ app.get('/', (_request, response) => {
   response.type('html').send(renderAppHtml())
 })
 
-app.post('/api/demo/reset', (_request, response) => {
+app.post('/api/system/reset', (_request, response) => {
   resetState()
   response.status(204).send()
 })
