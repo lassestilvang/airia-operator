@@ -46,7 +46,11 @@ class AiriaClient {
       throw new Error('AIRIA_API_KEY is not set')
     }
 
-    const response = await fetch(`${this.config.airiaApiBaseUrl}${path}`, {
+    const separator = path.includes('?') ? '&' : '?'
+    const projectIdParam = this.config.airiaProjectId ? `${separator}ProjectId=${this.config.airiaProjectId}` : ''
+    const url = `${this.config.airiaApiBaseUrl}${path}${projectIdParam}`
+
+    const response = await fetch(url, {
       ...init,
       headers: {
         'Content-Type': 'application/json',
@@ -59,7 +63,6 @@ class AiriaClient {
 
     if (!response.ok) {
       const text = await response.text()
-      console.error(`Airia API Error [${response.status}] ${path}:`, text)
       throw new Error(`Airia API ${path} failed (${response.status}): ${text}`)
     }
 
@@ -70,50 +73,24 @@ class AiriaClient {
     return (await response.json()) as T
   }
 
-  private async listTools(): Promise<Array<{ id: string; name?: string; standardizedName?: string }>> {
-    const projectId = this.config.airiaProjectId ? `&ProjectId=${this.config.airiaProjectId}` : ''
-    const page = await this.request<{ items?: Array<{ id: string; name?: string; standardizedName?: string }> }>(
-      `/v1/Tools?PageNumber=1&PageSize=200${projectId}`,
+  private async listTools(): Promise<Array<{ id: string; name?: string; standardizedName?: string; description?: string }>> {
+    const page = await this.request<{ items?: Array<{ id: string; name?: string; standardizedName?: string; description?: string }> }>(
+      '/v1/Tools?PageNumber=1&PageSize=200',
       { method: 'GET' },
     )
     return page.items ?? []
   }
 
-  private async upsertTool(spec: AiriaToolSpec): Promise<string> {
-    const existing = await this.listTools()
-    const found = existing.find((tool) => tool.name?.toLowerCase() === spec.payload.name?.toString().toLowerCase())
-
-    const payload = {
-      ...spec.payload,
-      projectId: this.config.airiaProjectId,
-    }
-
-    if (!found) {
-      const created = await this.request<{ id: string }>('/v1/Tools', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      })
-      return created.id
-    }
-
-    await this.request(`/v1/Tools/${found.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ ...payload, id: found.id }),
-    })
-    return found.id
-  }
-
   private async listPipelines(): Promise<Array<{ id: string; name?: string }>> {
-    const projectId = this.config.airiaProjectId ? `&ProjectId=${this.config.airiaProjectId}` : ''
     const page = await this.request<{ items?: Array<{ id: string; name?: string }> }>(
-      `/v1/PipelinesConfig?PageNumber=1&PageSize=200${projectId}`,
+      '/v1/PipelinesConfig?PageNumber=1&PageSize=200',
       { method: 'GET' },
     )
     return page.items ?? []
   }
 
   private async createAssistantFromSpec(spec: AiriaAgentSpec, tools: Record<string, { id: string; name: string; description: string }>): Promise<string> {
-    const modelsPage = await this.request<{ items?: Array<{ id: string }> }>('/v1/Models?PageNumber=1&PageSize=1', {
+    const modelsPage = await this.request<{ items?: Array<{ id: string }> }>('/v1/Models?PageNumber=1&PageSize=50', {
       method: 'GET',
     })
     const modelId = modelsPage.items?.[0]?.id
@@ -122,13 +99,14 @@ class AiriaClient {
       throw new Error('No models available to create assistant')
     }
 
+    // Skills MUST use PascalCase keys for the Airia API validation
     const skills = (spec.tools ?? [])
       .map((toolKey) => tools[toolKey])
       .filter(Boolean)
       .map((t) => ({ 
-        id: t.id,
-        name: t.name,
-        description: t.description
+        Id: t.id,
+        Name: t.name,
+        Description: t.description
       }))
 
     const payload = [
@@ -143,9 +121,11 @@ class AiriaClient {
         modalities: ['text'],
         defaultInputModes: ['text'],
         defaultOutputModes: ['text'],
+        userAgent: 'AiriaAutoOperator/1.0',
       },
     ]
 
+    console.log(`Creating Agent Card for ${spec.name}...`)
     const result = await this.request<Array<{ success: boolean; createdAgentId: string; errorMessage?: string }>>(
       '/v1/AgentCard',
       {
@@ -156,64 +136,32 @@ class AiriaClient {
 
     const first = result[0]
     if (!first?.success) {
-      throw new Error(`Failed to create agent card: ${first?.errorMessage ?? 'Unknown error'}`)
+      throw new Error(`Failed to create agent card for ${spec.name}: ${first?.errorMessage ?? 'Unknown error'}`)
+    }
+
+    // Wait longer for background pipeline creation
+    await sleep(2000)
+    const pipelines = await this.listPipelines()
+    const found = pipelines.find(p => p.name === spec.name)
+    
+    if (found) {
+      console.log(`Found linked Pipeline for ${spec.name}: ${found.id}`)
+      return found.id
     }
 
     return first.createdAgentId
   }
 
-  private async upsertAgent(spec: AiriaAgentSpec, tools: Record<string, { id: string; name: string; description: string }>): Promise<string> {
-    const pipelines = await this.listPipelines()
-    const existing = pipelines.find((pipeline) => pipeline.name === spec.name)
-
-    if (!existing) {
-      return this.createAssistantFromSpec(spec, tools)
-    }
-
-    // Fetch existing detail to preserve steps and other config
-    const detail = await this.request<{ activeVersion?: { steps: any[]; alignment: string } }>(
-      `/v1/PipelinesConfig/${existing.id}`,
-      { method: 'GET' },
-    )
-
-    const modelsPage = await this.request<{ items?: Array<{ id: string }> }>('/v1/Models?PageNumber=1&PageSize=1', {
-      method: 'GET',
-    })
-    const modelId = modelsPage.items?.[0]?.id
-
-    const skills = (spec.tools ?? [])
-      .map((toolKey) => tools[toolKey])
-      .filter(Boolean)
-      .map((t) => ({ 
-        id: t.id,
-        name: t.name,
-        description: t.description
-      }))
-
-    await this.request(`/v1/PipelinesConfig/${existing.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        id: existing.id,
-        name: spec.name,
-        description: spec.description,
-        instructions: spec.prompt,
-        modelId,
-        projectId: this.config.airiaProjectId,
-        skills,
-        steps: detail.activeVersion?.steps ?? [],
-        alignment: detail.activeVersion?.alignment ?? 'Vertical',
-      }),
-    })
-    return existing.id
-  }
-
   private async listSwarms(): Promise<Array<{ id: string; name: string; members?: Array<{ pipelineId: string }> }>> {
-    const projectId = this.config.airiaProjectId ? `&ProjectId=${this.config.airiaProjectId}` : ''
-    const response = await this.request<Array<{ id: string; name: string; members?: Array<{ pipelineId: string }> }>>(
-      `/v1/AgentSwarms?PageNumber=1&PageSize=200${projectId}`,
-      { method: 'GET' },
-    )
-    return response ?? []
+    try {
+      const response = await this.request<Array<{ id: string; name: string; members?: Array<{ pipelineId: string }> }>>(
+        '/v1/AgentSwarms?PageNumber=1&PageSize=200',
+        { method: 'GET' },
+      )
+      return response ?? []
+    } catch {
+      return []
+    }
   }
 
   private async ensureSwarmMembership(swarmId: string, pipelineIds: string[]): Promise<void> {
@@ -264,53 +212,55 @@ class AiriaClient {
   }
 
   private async cleanupAll(): Promise<void> {
-    const projectId = this.config.airiaProjectId ? `&ProjectId=${this.config.airiaProjectId}` : ''
-    
+    const names = ['CRM Agent', 'Docs Agent', 'Ops Agent', 'Comms Agent', 'Governance Agent', 'Test Agent']
+
     // 1. Delete Swarms
-    const swarms = await this.listSwarms()
-    for (const swarm of swarms) {
-      if (swarm.name === 'enterprise_customer_onboarding') {
-        await this.request(`/v1/AgentSwarms/${swarm.id}`, { method: 'DELETE' }).catch(() => {})
+    try {
+      const swarms = await this.listSwarms()
+      for (const swarm of swarms) {
+        if (swarm.name === 'enterprise_customer_onboarding') {
+          await this.request(`/v1/AgentSwarms/${swarm.id}`, { method: 'DELETE' }).catch(() => {})
+        }
       }
-    }
+    } catch {}
 
     // 2. Delete Pipelines
-    const pipelines = await this.listPipelines()
-    const names = ['CRM Agent', 'Docs Agent', 'Ops Agent', 'Comms Agent', 'Governance Agent', 'Test Agent']
-    for (const pipeline of pipelines) {
-      if (names.includes(pipeline.name ?? '')) {
-        await this.request(`/v1/PipelinesConfig/${pipeline.id}`, { method: 'DELETE' }).catch(() => {})
+    try {
+      const pipelines = await this.listPipelines()
+      for (const pipeline of pipelines) {
+        if (names.includes(pipeline.name ?? '')) {
+          await this.request(`/v1/PipelinesConfig/${pipeline.id}`, { method: 'DELETE' }).catch(() => {})
+        }
       }
-    }
+    } catch {}
 
     // 3. Delete Agent Cards
     try {
-      const cards = await this.request<Array<{ agentCardId: string; name: string }>>(`/v1/AgentCard?PageNumber=1&PageSize=200${projectId}`, { method: 'GET' })
+      const cardsPage = await this.request<{ items?: Array<{ agentCardId: string; name: string }> }>('/v1/AgentCard?PageNumber=1&PageSize=200', { method: 'GET' })
+      const cards = cardsPage.items ?? []
       for (const card of cards) {
         if (names.includes(card.name)) {
           await this.request(`/v1/AgentCard/${card.agentCardId}`, { method: 'DELETE' }).catch(() => {})
         }
       }
-    } catch (e) {
-      // Endpoint might not exist or list differently
-    }
+    } catch {}
 
     // 4. Delete Tools
-    const tools = await this.listTools()
-    const toolNames = ['mock-crm', 'mock-tasks', 'send-email', 'send-slack']
-    for (const tool of tools) {
-      if (toolNames.includes(tool.name ?? '')) {
-        await this.request(`/v1/Tools/${tool.id}`, { method: 'DELETE' }).catch(() => {})
+    try {
+      const tools = await this.listTools()
+      const toolNames = ['mock-crm', 'mock-tasks', 'send-email', 'send-slack']
+      for (const tool of tools) {
+        if (toolNames.includes(tool.name ?? '')) {
+          await this.request(`/v1/Tools/${tool.id}`, { method: 'DELETE' }).catch(() => {})
+        }
       }
-    }
+    } catch {}
   }
 
   async provision(args: { tools: AiriaToolSpec[]; agents: AiriaAgentSpec[]; workflowName: string }): Promise<AiriaProvisionResult> {
     console.log('Performing deep cleanup of Airia resources...')
-    // Try cleanup a few times to ensure everything is gone
     await this.cleanupAll().catch(() => {})
     await sleep(1000)
-    await this.cleanupAll().catch(() => {})
 
     console.log('Provisioning new Airia resources...')
     const toolEntries = await Promise.all(
@@ -318,7 +268,7 @@ class AiriaClient {
         const payload = {
           ...tool.payload,
           projectId: this.config.airiaProjectId,
-          routeThroughACC: false, // Ensure direct access via tunnel
+          routeThroughACC: false,
         }
         const created = await this.request<{ id: string }>('/v1/Tools', {
           method: 'POST',
@@ -335,7 +285,6 @@ class AiriaClient {
 
     const agentEntries = await Promise.all(
       args.agents.map(async (agent) => {
-        // Always create a new assistant (Agent Card + Pipeline)
         const id = await this.createAssistantFromSpec(agent, tools)
         return [agent.key, id] as const
       }),
@@ -353,11 +302,9 @@ class AiriaClient {
         userInput: goal,
         asyncOutput: false,
         includeToolsResponse: true,
-        saveHistory: true,
+        saveHistory: false,
       }),
     })
-
-    console.log(`Pipeline ${pipelineId} run response:`, JSON.stringify(response, null, 2))
 
     return {
       executionId: response.executionId ?? response.id ?? randomUUID(),
